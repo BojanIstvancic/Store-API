@@ -13,7 +13,7 @@ PRACTICE FILTERING AND SORT
 - sort - sort data based on some criteria "ascending / descending"
 */
 const getAllProducts = async (req, res) => {
-  const { featured, company, name, sort, fields } = req.query;
+  const { featured, company, name, sort, fields, numericFilters } = req.query;
   // get the query parameter
   /*
   create URI with query parameters
@@ -22,7 +22,7 @@ const getAllProducts = async (req, res) => {
   http://localhost:3000/api/v1/products?name=ed&sort=-name - &sort=-name -> -name  -> sort all products using "name" parameter "descending"
   http://localhost:3000/api/v1/products?fields=name,price - select just certain fields (name, price)
  {{URL}}/products?fields=name,price&sort=name&page=3 - logic is below (skip/limit)
- {{URL}}/products?fields=name,price&sort=name&limit=3 - logic is below (limit only)
+ {{URL}}/products?fields=name,price&numericFilters=price>40,rating>=4 - numeric filters
 
   */
   const queryObject = {};
@@ -40,6 +40,32 @@ const getAllProducts = async (req, res) => {
   if (name) {
     queryObject.name = { $regex: name, $options: "i" };
     // setup regex - name includes part of the string that is passed as parameter
+  }
+
+  if (numericFilters) {
+    const operatorMap = {
+      ">": "$gt",
+      ">=": "$gte",
+      "=": "$eq",
+      "<": "lt",
+      "<=": "$lte",
+    };
+
+    const regEx = /\b(<|>|>=|=|<|<=)\b/g;
+
+    let filters = numericFilters.replace(
+      regEx,
+      (match) => `-${operatorMap[match]}-`
+    );
+    // operator map that mongoose understands
+
+    const options = ["price", "rating"];
+    filters = filters.split(",").forEach((item) => {
+      const [field, operator, value] = item.split("-");
+      if (options.includes(field)) {
+        queryObject[field] = { [operator]: Number(value) };
+      }
+    });
   }
 
   let result = Product.find(queryObject);
